@@ -8,7 +8,6 @@ class FinderSync: FIFinderSync {
         super.init()
         
         // Monitor the entire filesystem so menu appears everywhere in Finder
-        // Note: NSHomeDirectory() returns sandbox container path, not real home
         FIFinderSyncController.default().directoryURLs = [URL(fileURLWithPath: "/")]
     }
     
@@ -70,12 +69,10 @@ class FinderSync: FIFinderSync {
         }
         guard let targetDir = dir else { return }
         
-        let path = targetDir.path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let src = "tell application \"Terminal\"\nactivate\ndo script \"cd \\\"\(path)\\\"\"\nend tell"
-        if let script = NSAppleScript(source: src) {
-            var err: NSDictionary?
-            script.executeAndReturnError(&err)
-        }
+        // Use NSWorkspace to open Terminal.app at the target directory
+        let terminalURL = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+        let config = NSWorkspace.OpenConfiguration()
+        NSWorkspace.shared.open([targetDir], withApplicationAt: terminalURL, configuration: config, completionHandler: nil)
     }
     
     // MARK: - New File
