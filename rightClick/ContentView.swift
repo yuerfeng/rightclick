@@ -1,8 +1,8 @@
 import SwiftUI
+import ServiceManagement
 
 struct ContentView: View {
-    @State private var monitoredPaths: [String] = [NSHomeDirectory()]
-    @State private var newPath: String = ""
+    @State private var launchAtLogin: Bool = false
     
     var body: some View {
         VStack(spacing: 20) {
@@ -29,7 +29,7 @@ struct ContentView: View {
                 Text("请在系统设置中启用扩展")
                     .font(.headline)
                 
-                Button("打开系统设置") {
+                Button("打开扩展设置") {
                     openSystemPreferences()
                 }
                 .buttonStyle(.borderedProminent)
@@ -38,43 +38,15 @@ struct ContentView: View {
             .background(Color(NSColor.controlBackgroundColor))
             .cornerRadius(8)
             
-            // Monitored Paths
+            // Settings
             VStack(alignment: .leading, spacing: 12) {
-                Text("监控目录")
+                Text("设置")
                     .font(.headline)
                 
-                Text("扩展只在这些目录下的右键菜单中生效")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                List {
-                    ForEach(monitoredPaths, id: \.self) { path in
-                        HStack {
-                            Image(systemName: "folder")
-                                .foregroundColor(.accentColor)
-                            Text(path)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                            Button(action: {
-                                removePath(path)
-                            }) {
-                                Image(systemName: "minus.circle.fill")
-                                    .foregroundColor(.red)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                Toggle("开机自动启动", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { newValue in
+                        setLaunchAtLogin(newValue)
                     }
-                }
-                .frame(height: 120)
-                .background(Color(NSColor.textBackgroundColor))
-                .cornerRadius(6)
-                
-                HStack {
-                    Button("添加目录...") {
-                        selectFolder()
-                    }
-                }
             }
             .padding()
             .background(Color(NSColor.controlBackgroundColor))
@@ -96,53 +68,40 @@ struct ContentView: View {
             Spacer()
         }
         .padding()
-        .frame(width: 400, height: 600)
+        .frame(width: 400, height: 500)
         .onAppear {
-            loadMonitoredPaths()
+            loadLaunchAtLogin()
         }
     }
     
     private func openSystemPreferences() {
-        // Open System Preferences > Extensions
         if let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences") {
             NSWorkspace.shared.open(url)
         }
     }
     
-    private func selectFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.message = "选择要监控的目录"
-        
-        if panel.runModal() == .OK, let url = panel.url {
-            let path = url.path
-            if !monitoredPaths.contains(path) {
-                monitoredPaths.append(path)
-                saveMonitoredPaths()
+    private func loadLaunchAtLogin() {
+        if #available(macOS 13.0, *) {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        } else {
+            launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")
+        }
+    }
+    
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        if #available(macOS 13.0, *) {
+            do {
+                if enabled {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                NSLog("Failed to set launch at login: \(error)")
             }
-        }
-    }
-    
-    private func removePath(_ path: String) {
-        monitoredPaths.removeAll { $0 == path }
-        if monitoredPaths.isEmpty {
-            monitoredPaths = [NSHomeDirectory()]
-        }
-        saveMonitoredPaths()
-    }
-    
-    private func saveMonitoredPaths() {
-        let defaults = UserDefaults(suiteName: "group.com.rightclick.shared")
-        defaults?.set(monitoredPaths, forKey: "monitoredPaths")
-        defaults?.synchronize()
-    }
-    
-    private func loadMonitoredPaths() {
-        let defaults = UserDefaults(suiteName: "group.com.rightclick.shared")
-        if let paths = defaults?.stringArray(forKey: "monitoredPaths"), !paths.isEmpty {
-            monitoredPaths = paths
+        } else {
+            // Fallback for macOS 12: use shared file list (best effort)
+            UserDefaults.standard.set(enabled, forKey: "launchAtLogin")
         }
     }
 }
