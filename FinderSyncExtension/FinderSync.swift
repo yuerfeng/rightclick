@@ -25,8 +25,6 @@ class FinderSync: FIFinderSync {
         terminalItem.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)
         menu.addItem(terminalItem)
         
-        menu.addItem(NSMenuItem.separator())
-        
         let newFileItem = NSMenuItem(title: "新建文件", action: nil, keyEquivalent: "")
         newFileItem.image = NSImage(systemSymbolName: "doc.badge.plus", accessibilityDescription: nil)
         let submenu = NSMenu()
